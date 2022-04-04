@@ -148,26 +148,58 @@ router.delete('/delete/:id',async (req,res)=>{
 router.get('/statistics/latest/:slug',async (req,res) =>{
     const date = new Date();
     var time
+    var numberPostLatest
     if(req.params.slug==="week"){
         var day = date.getDay();
         var diff = date.getDate() - day + (day == 0 ? -6:1);
         time = new Date(date.setDate(diff));
+        console.log(time)
+        numberPostLatest = await PostModel.aggregate([
+            {
+                $group:
+                  {
+                    _id:{$dayOfWeek: "$createdAt"},
+                    CountNumber: { 
+                        $count :{}
+                    }
+                  }
+            },
+            {
+                $sort:{
+                    "_id":1
+                }
+            }
+        ])
     }
     else if(req.params.slug === "month"){
         time = new Date(date.setDate(1));
-    }
-    else{
-        time = new Date(date.setDate(1));
         time.setMonth(0);
+        console.log(time)
+        numberPostLatest = await PostModel.aggregate([
+            {
+                $group:
+                  {
+                    _id:{$month: "$createdAt"},
+                    CountNumber: { 
+                        $count :{}
+                    },
+                    year:{$first:{$year:"$createdAt"}}
+
+                  }
+            }
+            ,{
+                $sort:{
+                    "_id":1
+                }
+            },
+            {
+                $match:{
+                    "year":{$eq:time.getUTCFullYear()}
+                }
+            }
+        ])
     }
-    try {
-        const numberPostLatest = await PostModel.find({createdAt:{$gte:time}}).count();
-        // console.log(numberPostLatest);
-        if(!numberPostLatest) return res.status(404).json({Success:false , Message:"Not found"});
-        res.status(200).json({Success:true, Message:"That's Oke", numberPostLatest:numberPostLatest});
-    } catch (error) {
-        res.status(500).json(({Success:false, Message:"Error, please try again", Error:error}));
-    }
+    res.status(200).json (numberPostLatest);
 })
 
 router.get('/statistics/view/:slug',async (req,res) =>{
